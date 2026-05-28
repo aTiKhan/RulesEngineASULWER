@@ -504,8 +504,10 @@ namespace RulesEngine
                     Expression = kvp.Value.ToString().ToLower()
                 });
 
-                // Replace @RuleName references in the expression
-                processedExpression = processedExpression.Replace($"@{kvp.Key}", kvp.Key);
+                // (?<!\w) ensures no word char precedes the @
+                // (?!\w) ensures no word char follows the rule name
+                var pattern = $@"(?<!\w)@{Regex.Escape(kvp.Key)}(?!\w)";
+                processedExpression = Regex.Replace(processedExpression, pattern, kvp.Key);
             }
 
             // Add success events as scoped parameters
