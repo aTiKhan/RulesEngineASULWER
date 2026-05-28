@@ -130,8 +130,12 @@ namespace RulesEngine
 
         public async ValueTask<List<RuleResultTree>> ExecuteAllRulesAsync(string workflowName, RuleParameter[] ruleParams, CancellationToken cancellationToken)
         {
-            Array.Sort(ruleParams, (RuleParameter a, RuleParameter b) => string.Compare(a.Name, b.Name));
-            var ruleResultList = ValidateWorkflowAndExecuteRule(workflowName, ruleParams);
+            // Copy before sorting to avoid mutating caller's array
+            var sortedParams = new RuleParameter[ruleParams.Length];
+            Array.Copy(ruleParams, sortedParams, ruleParams.Length);
+            Array.Sort(sortedParams, (RuleParameter a, RuleParameter b) => string.Compare(a.Name, b.Name));
+
+            var ruleResultList = ValidateWorkflowAndExecuteRule(workflowName, sortedParams);
             await ExecuteActionAsync(ruleResultList, cancellationToken);
             return ruleResultList;
         }
