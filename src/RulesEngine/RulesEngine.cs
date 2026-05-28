@@ -46,7 +46,17 @@ namespace RulesEngine
 
         public RulesEngine(string[] jsonConfig, ReSettings reSettings = null) : this(reSettings)
         {
-            var workflow = jsonConfig.Select(item => JsonSerializer.Deserialize<Workflow>(item, _jsonOptions)).ToArray();
+            var workflow = jsonConfig.Select((item, index) => {
+                try
+                {
+                    return JsonSerializer.Deserialize<Workflow>(item, _jsonOptions);
+                }
+                catch (JsonException ex)
+                {
+                    throw new RuleException($"Failed to deserialize workflow config at index {index}: {ex.Message}", ex);
+                }
+            }).ToArray();
+
             AddWorkflow(workflow);
         }
 
