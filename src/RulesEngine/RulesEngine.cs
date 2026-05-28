@@ -33,7 +33,7 @@ namespace RulesEngine
         private readonly RuleExpressionParser _ruleExpressionParser;
         private readonly RuleCompiler _ruleCompiler;
         private readonly ActionFactory _actionFactory;
-        private const string ParamParseRegex = "(\\$\\(.*?\\))";
+        private const string ParamParseRegex = @"\$\(([^)]+)\)";
 
         private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions {
             PropertyNameCaseInsensitive = true,
