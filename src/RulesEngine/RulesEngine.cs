@@ -244,7 +244,7 @@ namespace RulesEngine
             foreach (var ruleResult in ruleResultList)
             {
                 if (ruleResult.ChildResults != null)
-                    await ExecuteActionAsync(ruleResult.ChildResults);
+                    await ExecuteActionAsync(ruleResult.ChildResults, cancellationToken);
                 
                 var actionResult = await ExecuteActionForRuleResult(ruleResult, false, cancellationToken);
                 ruleResult.ActionResult = new ActionResult {
