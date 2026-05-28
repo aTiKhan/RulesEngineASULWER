@@ -35,13 +35,18 @@ namespace RulesEngine
         private readonly ActionFactory _actionFactory;
         private const string ParamParseRegex = "(\\$\\(.*?\\))";
 
+        private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions {
+            PropertyNameCaseInsensitive = true,
+            PropertyNamingPolicy = null  // Keep PascalCase in C#, accept any case in JSON
+        };
+
         #endregion
 
         #region Constructor
 
         public RulesEngine(string[] jsonConfig, ReSettings reSettings = null) : this(reSettings)
         {
-            var workflow = jsonConfig.Select(item => JsonSerializer.Deserialize<Workflow>(item)).ToArray();
+            var workflow = jsonConfig.Select(item => JsonSerializer.Deserialize<Workflow>(item, _jsonOptions)).ToArray();
             AddWorkflow(workflow);
         }
 
