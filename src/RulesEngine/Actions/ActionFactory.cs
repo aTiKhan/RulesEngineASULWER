@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation.
 //  Licensed under the MIT License.
 
+using RulesEngine.Exceptions;
 using System;
 using System.Collections.Generic;
 
@@ -28,7 +29,8 @@ namespace RulesEngine.Actions
             {
                 return _actionRegistry[name]();
             }
-            throw new KeyNotFoundException($"Action with name: {name} does not exist");
+
+            throw new ActionNotFoundException(name);
         }
     }
 }
