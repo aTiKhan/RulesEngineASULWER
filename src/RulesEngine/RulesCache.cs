@@ -19,12 +19,10 @@ namespace RulesEngine
         /// <summary>The workflow rules</summary>
         private readonly ConcurrentDictionary<string, (Workflow, long)> _workflow = new ConcurrentDictionary<string, (Workflow, long)>();
 
-
         public RulesCache(ReSettings reSettings)
         {
             _compileRules = new MemCache(reSettings.CacheConfig);
         }
-
 
         /// <summary>Determines whether [contains workflow rules] [the specified workflow name].</summary>
         /// <param name="workflowName">Name of the workflow.</param>
@@ -91,23 +89,32 @@ namespace RulesEngine
         {
             if (_workflow.TryGetValue(workflowName, out (Workflow rules, long tick) WorkflowsObj))
             {
-                var workflow = WorkflowsObj.rules;
-                if (workflow.WorkflowsToInject?.Any() == true)
-                {
-                    if (workflow.Rules == null)
-                    {
-                        workflow.Rules = new List<Rule>();
-                    }
-                    foreach (string wfname in workflow.WorkflowsToInject)
-                    {
-                        var injectedWorkflow = GetWorkflow(wfname);
-                        if (injectedWorkflow == null)
-                        {
-                            throw new Exception($"Could not find injected Workflow: {wfname}");
-                        }
+                var baseWorkflow = WorkflowsObj.rules;
 
-                        workflow.Rules = workflow.Rules.Concat(injectedWorkflow.Rules).ToList();
+                // If no injection needed, return as-is (or still clone to be safe)
+                if (baseWorkflow.WorkflowsToInject?.Any() != true)
+                {
+                    return baseWorkflow;
+                }
+
+                // Create a shallow copy to avoid mutating the cache
+                var workflow = new Workflow {
+                    WorkflowName = baseWorkflow.WorkflowName,
+                    GlobalParams = baseWorkflow.GlobalParams,
+                    RuleExpressionType = baseWorkflow.RuleExpressionType,
+                    WorkflowsToInject = baseWorkflow.WorkflowsToInject,
+                    Rules = baseWorkflow.Rules?.ToList() ?? new List<Rule>()
+                };
+
+                foreach (string wfname in baseWorkflow.WorkflowsToInject)
+                {
+                    var injectedWorkflow = GetWorkflow(wfname);
+                    if (injectedWorkflow == null)
+                    {
+                        throw new Exception($"Could not find injected Workflow: {wfname}");
                     }
+
+                    workflow.Rules = workflow.Rules.Concat(injectedWorkflow.Rules).ToList();
                 }
 
                 return workflow;
@@ -117,7 +124,6 @@ namespace RulesEngine
                 return null;
             }
         }
-
 
         /// <summary>Gets the compiled rules.</summary>
         /// <param name="compiledRulesKey">The compiled rules key.</param>
