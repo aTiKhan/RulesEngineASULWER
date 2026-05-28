@@ -1,3 +1,5 @@
+# Documentation for [Rules Engine](https://asulwer.github.io/RulesEngine/) moved from Wiki to GitHub Pages.
+
 # [Alternate RulesEngine](https://github.com/asulwer/Rules)
 
 NOTE: I have been writing a rewrite that is considerably faster than the original RulesEngine (and this fork).  Very infant and not published on Nuget.
