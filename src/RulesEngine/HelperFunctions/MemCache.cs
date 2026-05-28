@@ -16,7 +16,6 @@ namespace RulesEngine.HelperFunctions
     {
         private readonly MemCacheConfig _config;
         private ConcurrentDictionary<string, (object value, DateTimeOffset expiry)> _cacheDictionary;
-        private ConcurrentQueue<(string key, DateTimeOffset expiry)> _cacheEvictionQueue;
 
         public MemCache(MemCacheConfig config)
         {
@@ -104,7 +103,6 @@ namespace RulesEngine.HelperFunctions
         public void Clear()
         {
             _cacheDictionary.Clear();
-            _cacheEvictionQueue =  new ConcurrentQueue<(string key, DateTimeOffset expiry)>();
         }
     }
 }
