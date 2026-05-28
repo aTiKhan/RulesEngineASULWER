@@ -4,13 +4,13 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace RulesEngine.HelperFunctions
 {
     public class MemCacheConfig {
         public int SizeLimit { get; set; } = 1000;
     }
-
 
     internal class MemCache
     {
@@ -49,13 +49,11 @@ namespace RulesEngine.HelperFunctions
            
         }
 
-
         public T Get<T>(string key)
         {
             TryGetValue<T>(key, out var value);
             return value;
         }
-
 
         /// <summary>
         /// Returns all known keys. May return keys for expired data as well
@@ -80,23 +78,21 @@ namespace RulesEngine.HelperFunctions
         {
             var fixedExpiry = expiry ?? DateTimeOffset.MaxValue;
 
+            // If at capacity, evict oldest by expiry
             while (_cacheDictionary.Count > _config.SizeLimit)
             {
-                if (_cacheEvictionQueue.IsEmpty)
+                var oldest = _cacheDictionary.OrderBy(kv => kv.Value.expiry).FirstOrDefault();
+                if (oldest.Key != null)
                 {
-                    _cacheDictionary.Clear();
+                    _cacheDictionary.TryRemove(oldest.Key, out _);
                 }
-                if(_cacheEvictionQueue.TryDequeue(out var result)
-                    && _cacheDictionary.TryGetValue(result.key,out var dictionaryValue)
-                    &&  dictionaryValue.expiry == result.expiry)
-                {   
-                    _cacheDictionary.TryRemove(result.key, out _);
+                else
+                {
+                    break; // Shouldn't happen but prevents infinite loop
                 }
-                
             }
 
             _cacheDictionary.AddOrUpdate(key, (value, fixedExpiry), (k, v) => (value, fixedExpiry));
-            _cacheEvictionQueue.Enqueue((key, fixedExpiry));
             return value;
         }
 
