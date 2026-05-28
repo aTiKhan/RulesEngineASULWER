@@ -4,37 +4,37 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace RulesEngine.HelperFunctions
 {
-    public class MemCacheConfig {
+    public class MemCacheConfig
+    {
+        //use a simple in-memory cache with expiry and size limit. Eviction is based on expiry time (oldest first)
         public int SizeLimit { get; set; } = 1000;
     }
-
 
     internal class MemCache
     {
         private readonly MemCacheConfig _config;
         private ConcurrentDictionary<string, (object value, DateTimeOffset expiry)> _cacheDictionary;
-        private ConcurrentQueue<(string key, DateTimeOffset expiry)> _cacheEvictionQueue;
 
         public MemCache(MemCacheConfig config)
         {
-            if(config == null)
+            if (config == null)
             {
                 config = new MemCacheConfig();
             }
             _config = config;
             _cacheDictionary = new ConcurrentDictionary<string, (object value, DateTimeOffset expiry)>();
-            _cacheEvictionQueue = new ConcurrentQueue<(string key, DateTimeOffset expiry)>();
         }
 
-        public bool TryGetValue<T>(string key,out T value)
+        public bool TryGetValue<T>(string key, out T value)
         {
             value = default;
             if (_cacheDictionary.TryGetValue(key, out var cacheItem))
             {
-                if(cacheItem.expiry < DateTimeOffset.UtcNow)
+                if (cacheItem.expiry < DateTimeOffset.UtcNow)
                 {
                     _cacheDictionary.TryRemove(key, out _);
                     return false;
@@ -43,19 +43,17 @@ namespace RulesEngine.HelperFunctions
                 {
                     value = (T)cacheItem.value;
                     return true;
-                }   
+                }
             }
             return false;
-           
-        }
 
+        }
 
         public T Get<T>(string key)
         {
             TryGetValue<T>(key, out var value);
             return value;
         }
-
 
         /// <summary>
         /// Returns all known keys. May return keys for expired data as well
@@ -68,10 +66,10 @@ namespace RulesEngine.HelperFunctions
 
         public T GetOrCreate<T>(string key, Func<T> createFn, DateTimeOffset? expiry = null)
         {
-            if(!TryGetValue<T>(key,out var value))
+            if (!TryGetValue<T>(key, out var value))
             {
                 value = createFn();
-                return Set<T>(key,value,expiry);
+                return Set<T>(key, value, expiry);
             }
             return value;
         }
@@ -80,23 +78,21 @@ namespace RulesEngine.HelperFunctions
         {
             var fixedExpiry = expiry ?? DateTimeOffset.MaxValue;
 
+            // If at capacity, evict oldest by expiry
             while (_cacheDictionary.Count > _config.SizeLimit)
             {
-                if (_cacheEvictionQueue.IsEmpty)
+                var oldest = _cacheDictionary.OrderBy(kv => kv.Value.expiry).FirstOrDefault();
+                if (oldest.Key != null)
                 {
-                    _cacheDictionary.Clear();
+                    _cacheDictionary.TryRemove(oldest.Key, out _);
                 }
-                if(_cacheEvictionQueue.TryDequeue(out var result)
-                    && _cacheDictionary.TryGetValue(result.key,out var dictionaryValue)
-                    &&  dictionaryValue.expiry == result.expiry)
-                {   
-                    _cacheDictionary.TryRemove(result.key, out _);
+                else
+                {
+                    break; // Shouldn't happen but prevents infinite loop
                 }
-                
             }
 
             _cacheDictionary.AddOrUpdate(key, (value, fixedExpiry), (k, v) => (value, fixedExpiry));
-            _cacheEvictionQueue.Enqueue((key, fixedExpiry));
             return value;
         }
 
@@ -108,7 +104,6 @@ namespace RulesEngine.HelperFunctions
         public void Clear()
         {
             _cacheDictionary.Clear();
-            _cacheEvictionQueue =  new ConcurrentQueue<(string key, DateTimeOffset expiry)>();
         }
     }
 }

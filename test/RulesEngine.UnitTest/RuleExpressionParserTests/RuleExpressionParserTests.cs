@@ -35,14 +35,13 @@ namespace RulesEngine.UnitTest.RuleExpressionParserTests
             };
             var input = JsonSerializer.Deserialize<ExpandoObject>(inputStr, options);
 
-
             var value1 = ruleParser.Evaluate<object>("input.list[0].item3 == 1", new[] { new RuleParameter("input", input) });
             var value2 = ruleParser.Evaluate<object>("input.list[1].item1 == \"world\"", new[] { new RuleParameter("input", input) });
-            var value3= ruleParser.Evaluate<object>("string.Concat(input.list[0].item1, input.list[1].item1)", new[] { new RuleParameter("input", input) });
+            var value3 = ruleParser.Evaluate<object>("string.Concat(input.list[0].item3, input.list[1].item1)", new[] { new RuleParameter("input", input) });
 
-             Assert.Equal(true, value1);
+            Assert.Equal(true, value1);
             Assert.Equal(true, value2);
-            Assert.Equal("helloworld", value3);
+            Assert.Equal("1world", value3);
         }
 
         [Fact]

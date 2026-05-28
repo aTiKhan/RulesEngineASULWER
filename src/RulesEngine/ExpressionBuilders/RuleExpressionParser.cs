@@ -32,12 +32,18 @@ namespace RulesEngine.ExpressionBuilders
         }
         public Expression Parse(string expression, ParameterExpression[] parameters, Type returnType)
         {
-            var config = new ParsingConfig { 
+            if (parameters == null)
+                throw new ArgumentNullException(nameof(parameters), "Parameter expressions cannot be null");
+
+            if (parameters.Any(p => p == null))
+                throw new ArgumentException("Parameter expressions array cannot contain null elements", nameof(parameters));
+
+            var config = new ParsingConfig {
                 CustomTypeProvider = new CustomTypeProvider(_reSettings.CustomTypes),
                 IsCaseSensitive = _reSettings.IsExpressionCaseSensitive
             };
-            return new ExpressionParser(parameters, expression, new object[] { }, config).Parse(returnType);
 
+            return new ExpressionParser(parameters, expression, new object[] { }, config).Parse(returnType);
         }
 
         public Func<object[], T> Compile<T>(string expression, RuleParameter[] ruleParams)
@@ -101,7 +107,7 @@ namespace RulesEngine.ExpressionBuilders
             });
         }
 
-        // <summary>
+        /// <summary>
         /// Gets the parameter expression.
         /// </summary>
         /// <param name="ruleParams">The types.</param>

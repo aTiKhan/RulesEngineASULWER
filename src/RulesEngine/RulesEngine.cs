@@ -33,7 +33,12 @@ namespace RulesEngine
         private readonly RuleExpressionParser _ruleExpressionParser;
         private readonly RuleCompiler _ruleCompiler;
         private readonly ActionFactory _actionFactory;
-        private const string ParamParseRegex = "(\\$\\(.*?\\))";
+        private const string ParamParseRegex = @"\$\(([^)]+)\)";
+
+        private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions {
+            PropertyNameCaseInsensitive = true,
+            PropertyNamingPolicy = null  // Keep PascalCase in C#, accept any case in JSON
+        };
 
         #endregion
 
@@ -41,7 +46,17 @@ namespace RulesEngine
 
         public RulesEngine(string[] jsonConfig, ReSettings reSettings = null) : this(reSettings)
         {
-            var workflow = jsonConfig.Select(item => JsonSerializer.Deserialize<Workflow>(item)).ToArray();
+            var workflow = jsonConfig.Select((item, index) => {
+                try
+                {
+                    return JsonSerializer.Deserialize<Workflow>(item, _jsonOptions);
+                }
+                catch (JsonException ex)
+                {
+                    throw new RuleException($"Failed to deserialize workflow config at index {index}: {ex.Message}", ex);
+                }
+            }).ToArray();
+
             AddWorkflow(workflow);
         }
 
@@ -52,14 +67,14 @@ namespace RulesEngine
 
         public RulesEngine(ReSettings reSettings = null)
         {
-            _reSettings = reSettings == null ? new ReSettings(): new ReSettings(reSettings);
-            if(_reSettings.CacheConfig == null)
+            _reSettings = reSettings == null ? new ReSettings() : new ReSettings(reSettings);
+            if (_reSettings.CacheConfig == null)
             {
-                _reSettings.CacheConfig = new MemCacheConfig();         
+                _reSettings.CacheConfig = new MemCacheConfig();
             }
             _rulesCache = new RulesCache(_reSettings);
             _ruleExpressionParser = new RuleExpressionParser(_reSettings);
-            _ruleCompiler = new RuleCompiler(new RuleExpressionBuilderFactory(_reSettings, _ruleExpressionParser),_reSettings);
+            _ruleCompiler = new RuleCompiler(new RuleExpressionBuilderFactory(_reSettings, _ruleExpressionParser), _reSettings);
             _actionFactory = new ActionFactory(GetActionRegistry(_reSettings));
         }
 
@@ -130,8 +145,12 @@ namespace RulesEngine
 
         public async ValueTask<List<RuleResultTree>> ExecuteAllRulesAsync(string workflowName, RuleParameter[] ruleParams, CancellationToken cancellationToken)
         {
-            Array.Sort(ruleParams, (RuleParameter a, RuleParameter b) => string.Compare(a.Name, b.Name));
-            var ruleResultList = ValidateWorkflowAndExecuteRule(workflowName, ruleParams);
+            // Copy before sorting to avoid mutating caller's array
+            var sortedParams = new RuleParameter[ruleParams.Length];
+            Array.Copy(ruleParams, sortedParams, ruleParams.Length);
+            Array.Sort(sortedParams, (RuleParameter a, RuleParameter b) => string.Compare(a.Name, b.Name));
+
+            var ruleResultList = ValidateWorkflowAndExecuteRule(workflowName, sortedParams);
             await ExecuteActionAsync(ruleResultList, cancellationToken);
             return ruleResultList;
         }
@@ -244,8 +263,8 @@ namespace RulesEngine
             foreach (var ruleResult in ruleResultList)
             {
                 if (ruleResult.ChildResults != null)
-                    await ExecuteActionAsync(ruleResult.ChildResults);
-                
+                    await ExecuteActionAsync(ruleResult.ChildResults, cancellationToken);
+
                 var actionResult = await ExecuteActionForRuleResult(ruleResult, false, cancellationToken);
                 ruleResult.ActionResult = new ActionResult {
                     Output = actionResult.Output,
@@ -330,7 +349,7 @@ namespace RulesEngine
 
                 foreach (var rule in workflow.Rules.Where(c => c.Enabled))
                 {
-                    dictFunc.Add(rule.RuleName, CompileRule(rule,workflow.RuleExpressionType, ruleParams, globalParamExp));
+                    dictFunc.Add(rule.RuleName, CompileRule(rule, workflow.RuleExpressionType, ruleParams, globalParamExp));
                 }
 
                 _rulesCache.AddOrUpdateCompiledRule(compileRulesKey, dictFunc);
@@ -367,7 +386,7 @@ namespace RulesEngine
         private RuleFunc<RuleResultTree> CompileRule(string workflowName, string ruleName, RuleParameter[] ruleParameters)
         {
             var workflow = _rulesCache.GetWorkflow(workflowName);
-            if(workflow == null)
+            if (workflow == null)
             {
                 throw new ArgumentException($"Workflow `{workflowName}` is not found");
             }
@@ -379,7 +398,7 @@ namespace RulesEngine
             var globalParamExp = new Lazy<RuleExpressionParameter[]>(
                   () => _ruleCompiler.GetRuleExpressionParameters(workflow.RuleExpressionType, workflow.GlobalParams, ruleParameters)
               );
-            return CompileRule(currentRule,workflow.RuleExpressionType, ruleParameters, globalParamExp);
+            return CompileRule(currentRule, workflow.RuleExpressionType, ruleParameters, globalParamExp);
         }
 
         private RuleFunc<RuleResultTree> CompileRule(Rule rule, RuleExpressionType ruleExpressionType, RuleParameter[] ruleParams, Lazy<RuleExpressionParameter[]> scopedParams)
@@ -459,7 +478,10 @@ namespace RulesEngine
 
             foreach (var ruleName in availableRuleNames)
             {
-                if (expression.Contains($"@{ruleName}"))
+                // Match @RuleName where RuleName is a complete identifier
+                // (?!\w) ensures no word char follows (so @Test2 doesn't match @Test)
+                var pattern = $@"@{Regex.Escape(ruleName)}(?!\w)";
+                if (Regex.IsMatch(expression, pattern))
                     return true;
             }
             return false;
@@ -472,7 +494,10 @@ namespace RulesEngine
 
             foreach (var eventName in availableSuccessEvents)
             {
-                if (expression.Contains(eventName))
+                // Use \b for word boundary - matches whole identifier only
+                // Regex.Escape handles any special regex chars in the event name
+                var pattern = $@"\b{Regex.Escape(eventName)}\b";
+                if (Regex.IsMatch(expression, pattern))
                     return true;
             }
             return false;
@@ -498,8 +523,10 @@ namespace RulesEngine
                     Expression = kvp.Value.ToString().ToLower()
                 });
 
-                // Replace @RuleName references in the expression
-                processedExpression = processedExpression.Replace($"@{kvp.Key}", kvp.Key);
+                // (?<!\w) ensures no word char precedes the @
+                // (?!\w) ensures no word char follows the rule name
+                var pattern = $@"(?<!\w)@{Regex.Escape(kvp.Key)}(?!\w)";
+                processedExpression = Regex.Replace(processedExpression, pattern, kvp.Key);
             }
 
             // Add success events as scoped parameters
@@ -540,7 +567,8 @@ namespace RulesEngine
 
         private string GetCompiledRulesKey(string workflowName, RuleParameter[] ruleParams)
         {
-            var ruleParamsKey = string.Join("-", ruleParams.Select(c => $"{c.Name}_{c.Type.Name}"));
+            // Use FullName instead of Name to avoid collisions
+            var ruleParamsKey = string.Join("-", ruleParams.Select(c => $"{c.Name}_{c.Type.FullName}"));
             var key = $"{workflowName}-" + ruleParamsKey;
             return key;
         }
@@ -621,7 +649,7 @@ namespace RulesEngine
 
             return errorMessage;
         }
-        
+
         #endregion
     }
 }

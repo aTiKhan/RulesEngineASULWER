@@ -72,8 +72,6 @@ namespace RulesEngine
             }
         }
 
-
-
         /// <summary>
         /// Gets the expression for rule.
         /// </summary>
@@ -117,15 +115,14 @@ namespace RulesEngine
                 var parameterNames = new HashSet<string>(parameters.Select(p => p.Name));
 
                 var expressionBuilder = GetExpressionBuilder(ruleExpressionType);
-                var parametersArray = parameters.ToArray();
-
+                
                 foreach (var lp in localParams)
                 {
                     try
                     {
                         if (!parameterNames.Add(lp.Name)) continue;
 
-                        var lpExpression = expressionBuilder.Parse(lp.Expression, parametersArray, null);
+                        var lpExpression = expressionBuilder.Parse(lp.Expression, parameters.ToArray(), null);
 
                         var ruleExpParam = new RuleExpressionParameter {
                             ParameterExpression = Expression.Parameter(lpExpression.Type, lp.Name),
@@ -133,8 +130,6 @@ namespace RulesEngine
                         };
                         parameters.Add(ruleExpParam.ParameterExpression);
                         ruleExpParams.Add(ruleExpParam);
-
-                        parametersArray = parameters.ToArray();
                     }
                     catch(Exception ex)
                     {
@@ -189,7 +184,6 @@ namespace RulesEngine
                 return result(paramArray);
             };
         }
-
 
         private (bool isSuccess ,IEnumerable<RuleResultTree> result) ApplyOperation(RuleParameter[] paramArray,IEnumerable<RuleFunc<RuleResultTree>> ruleFuncList, ExpressionType operation)
         {
