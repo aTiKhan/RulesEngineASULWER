@@ -472,7 +472,10 @@ namespace RulesEngine
 
             foreach (var eventName in availableSuccessEvents)
             {
-                if (expression.Contains(eventName))
+                // Use \b for word boundary - matches whole identifier only
+                // Regex.Escape handles any special regex chars in the event name
+                var pattern = $@"\b{Regex.Escape(eventName)}\b";
+                if (Regex.IsMatch(expression, pattern))
                     return true;
             }
             return false;
