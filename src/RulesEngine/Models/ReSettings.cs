@@ -24,11 +24,12 @@ namespace RulesEngine.Models
             EnableFormattedErrorMessage = reSettings.EnableFormattedErrorMessage;
             EnableScopedParams = reSettings.EnableScopedParams;
             NestedRuleExecutionMode = reSettings.NestedRuleExecutionMode;
-            MemCache_Size = reSettings.MemCache_Size;
+            CacheConfig = reSettings.CacheConfig;
             IsExpressionCaseSensitive = reSettings.IsExpressionCaseSensitive;
             AutoRegisterInputType = reSettings.AutoRegisterInputType;
             UseFastExpressionCompiler = reSettings.UseFastExpressionCompiler;
         }
+
 
         /// <summary>
         /// Get/Set the custom types to be used in Rule expressions
@@ -78,7 +79,7 @@ namespace RulesEngine.Models
         /// Sets the mode for Nested rule execution, Default: All
         /// </summary>
         public NestedRuleExecutionMode NestedRuleExecutionMode { get; set; } = NestedRuleExecutionMode.All;
-        public int MemCache_Size { get; set; }
+        public MemCacheConfig CacheConfig { get; set; }
         /// <summary>
         /// Whether to use FastExpressionCompiler for rule compilation
         /// </summary>
