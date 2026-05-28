@@ -7,7 +7,6 @@ using RulesEngine.Actions;
 using RulesEngine.Exceptions;
 using RulesEngine.ExpressionBuilders;
 using RulesEngine.Extensions;
-using RulesEngine.HelperFunctions;
 using RulesEngine.Interfaces;
 using RulesEngine.Models;
 using RulesEngine.Validators;
@@ -67,10 +66,10 @@ namespace RulesEngine
 
         public RulesEngine(ReSettings reSettings = null)
         {
-            _reSettings = reSettings == null ? new ReSettings(): new ReSettings(reSettings);
+            _reSettings = reSettings == null ? new ReSettings() : new ReSettings(reSettings);
             _rulesCache = new RulesCache(_reSettings);
             _ruleExpressionParser = new RuleExpressionParser(_reSettings);
-            _ruleCompiler = new RuleCompiler(new RuleExpressionBuilderFactory(_reSettings, _ruleExpressionParser),_reSettings);
+            _ruleCompiler = new RuleCompiler(new RuleExpressionBuilderFactory(_reSettings, _ruleExpressionParser), _reSettings);
             _actionFactory = new ActionFactory(GetActionRegistry(_reSettings));
         }
 
@@ -260,7 +259,7 @@ namespace RulesEngine
             {
                 if (ruleResult.ChildResults != null)
                     await ExecuteActionAsync(ruleResult.ChildResults, cancellationToken);
-                
+
                 var actionResult = await ExecuteActionForRuleResult(ruleResult, false, cancellationToken);
                 ruleResult.ActionResult = new ActionResult {
                     Output = actionResult.Output,
@@ -345,7 +344,7 @@ namespace RulesEngine
 
                 foreach (var rule in workflow.Rules.Where(c => c.Enabled))
                 {
-                    dictFunc.Add(rule.RuleName, CompileRule(rule,workflow.RuleExpressionType, ruleParams, globalParamExp));
+                    dictFunc.Add(rule.RuleName, CompileRule(rule, workflow.RuleExpressionType, ruleParams, globalParamExp));
                 }
 
                 _rulesCache.AddOrUpdateCompiledRule(compileRulesKey, dictFunc);
@@ -382,7 +381,7 @@ namespace RulesEngine
         private RuleFunc<RuleResultTree> CompileRule(string workflowName, string ruleName, RuleParameter[] ruleParameters)
         {
             var workflow = _rulesCache.GetWorkflow(workflowName);
-            if(workflow == null)
+            if (workflow == null)
             {
                 throw new ArgumentException($"Workflow `{workflowName}` is not found");
             }
@@ -394,7 +393,7 @@ namespace RulesEngine
             var globalParamExp = new Lazy<RuleExpressionParameter[]>(
                   () => _ruleCompiler.GetRuleExpressionParameters(workflow.RuleExpressionType, workflow.GlobalParams, ruleParameters)
               );
-            return CompileRule(currentRule,workflow.RuleExpressionType, ruleParameters, globalParamExp);
+            return CompileRule(currentRule, workflow.RuleExpressionType, ruleParameters, globalParamExp);
         }
 
         private RuleFunc<RuleResultTree> CompileRule(Rule rule, RuleExpressionType ruleExpressionType, RuleParameter[] ruleParams, Lazy<RuleExpressionParameter[]> scopedParams)
@@ -645,7 +644,7 @@ namespace RulesEngine
 
             return errorMessage;
         }
-        
+
         #endregion
     }
 }

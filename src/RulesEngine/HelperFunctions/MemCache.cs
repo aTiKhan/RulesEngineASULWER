@@ -20,12 +20,12 @@ namespace RulesEngine.HelperFunctions
             _cacheDictionary = new ConcurrentDictionary<string, (object value, DateTimeOffset expiry)>();
         }
 
-        public bool TryGetValue<T>(string key,out T value)
+        public bool TryGetValue<T>(string key, out T value)
         {
             value = default;
             if (_cacheDictionary.TryGetValue(key, out var cacheItem))
             {
-                if(cacheItem.expiry < DateTimeOffset.UtcNow)
+                if (cacheItem.expiry < DateTimeOffset.UtcNow)
                 {
                     _cacheDictionary.TryRemove(key, out _);
                     return false;
@@ -34,10 +34,10 @@ namespace RulesEngine.HelperFunctions
                 {
                     value = (T)cacheItem.value;
                     return true;
-                }   
+                }
             }
             return false;
-           
+
         }
 
         public T Get<T>(string key)
@@ -57,10 +57,10 @@ namespace RulesEngine.HelperFunctions
 
         public T GetOrCreate<T>(string key, Func<T> createFn, DateTimeOffset? expiry = null)
         {
-            if(!TryGetValue<T>(key,out var value))
+            if (!TryGetValue<T>(key, out var value))
             {
                 value = createFn();
-                return Set<T>(key,value,expiry);
+                return Set<T>(key, value, expiry);
             }
             return value;
         }

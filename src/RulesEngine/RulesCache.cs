@@ -53,13 +53,13 @@ namespace RulesEngine
         public void AddOrUpdateCompiledRule(string compiledRuleKey, IDictionary<string, RuleFunc<RuleResultTree>> compiledRule)
         {
             long ticks = DateTime.UtcNow.Ticks;
-            _compileRules.Set(compiledRuleKey,(compiledRule, ticks));
+            _compileRules.Set(compiledRuleKey, (compiledRule, ticks));
         }
 
         /// <summary>Checks if the compiled rules are up-to-date.</summary>
         /// <param name="compiledRuleKey">The compiled rule key.</param>
         /// <param name="workflowName">The workflow name.</param>
-         /// <returns>
+        /// <returns>
         ///   <c>true</c> if [compiled rules] is newer than the [workflow rules]; otherwise, <c>false</c>.</returns>
         public bool AreCompiledRulesUpToDate(string compiledRuleKey, string workflowName)
         {
