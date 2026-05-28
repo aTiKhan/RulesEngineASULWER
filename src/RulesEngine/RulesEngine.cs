@@ -459,7 +459,10 @@ namespace RulesEngine
 
             foreach (var ruleName in availableRuleNames)
             {
-                if (expression.Contains($"@{ruleName}"))
+                // Match @RuleName where RuleName is a complete identifier
+                // (?!\w) ensures no word char follows (so @Test2 doesn't match @Test)
+                var pattern = $@"@{Regex.Escape(ruleName)}(?!\w)";
+                if (Regex.IsMatch(expression, pattern))
                     return true;
             }
             return false;
