@@ -68,10 +68,6 @@ namespace RulesEngine
         public RulesEngine(ReSettings reSettings = null)
         {
             _reSettings = reSettings == null ? new ReSettings(): new ReSettings(reSettings);
-            if(_reSettings.CacheConfig == null)
-            {
-                _reSettings.CacheConfig = new MemCacheConfig();         
-            }
             _rulesCache = new RulesCache(_reSettings);
             _ruleExpressionParser = new RuleExpressionParser(_reSettings);
             _ruleCompiler = new RuleCompiler(new RuleExpressionBuilderFactory(_reSettings, _ruleExpressionParser),_reSettings);

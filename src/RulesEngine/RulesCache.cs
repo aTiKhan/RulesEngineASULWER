@@ -21,7 +21,7 @@ namespace RulesEngine
 
         public RulesCache(ReSettings reSettings)
         {
-            _compileRules = new MemCache(reSettings.CacheConfig);
+            _compileRules = new MemCache(reSettings.MemCache_Size);
         }
 
         /// <summary>Determines whether [contains workflow rules] [the specified workflow name].</summary>

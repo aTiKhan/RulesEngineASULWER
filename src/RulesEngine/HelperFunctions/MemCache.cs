@@ -8,24 +8,16 @@ using System.Linq;
 
 namespace RulesEngine.HelperFunctions
 {
-    public class MemCacheConfig {
-        public int SizeLimit { get; set; } = 1000;
-    }
-
     internal class MemCache
     {
-        private readonly MemCacheConfig _config;
+        //use a simple in-memory cache with expiry and size limit. Eviction is based on expiry time (oldest first)
+        public int SizeLimit { get; set; } = 1000;
         private ConcurrentDictionary<string, (object value, DateTimeOffset expiry)> _cacheDictionary;
 
-        public MemCache(MemCacheConfig config)
+        public MemCache(int sl)
         {
-            if(config == null)
-            {
-                config = new MemCacheConfig();
-            }
-            _config = config;
+            SizeLimit = sl;
             _cacheDictionary = new ConcurrentDictionary<string, (object value, DateTimeOffset expiry)>();
-            _cacheEvictionQueue = new ConcurrentQueue<(string key, DateTimeOffset expiry)>();
         }
 
         public bool TryGetValue<T>(string key,out T value)
@@ -78,7 +70,7 @@ namespace RulesEngine.HelperFunctions
             var fixedExpiry = expiry ?? DateTimeOffset.MaxValue;
 
             // If at capacity, evict oldest by expiry
-            while (_cacheDictionary.Count > _config.SizeLimit)
+            while (_cacheDictionary.Count > SizeLimit)
             {
                 var oldest = _cacheDictionary.OrderBy(kv => kv.Value.expiry).FirstOrDefault();
                 if (oldest.Key != null)
