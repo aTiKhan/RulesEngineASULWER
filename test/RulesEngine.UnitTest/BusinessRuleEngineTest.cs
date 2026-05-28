@@ -832,7 +832,7 @@ namespace RulesEngine.UnitTest
             var exceptionruleTwo = result[1].ActionResult?.Exception;
 
             Assert.Null(exceptionruleOne);
-            Assert.IsType<TaskCanceledException>(exceptionruleTwo?.InnerException);
+            Assert.IsType<TaskCanceledException>(exceptionruleTwo);
         }
 
         [Theory]
@@ -854,7 +854,7 @@ namespace RulesEngine.UnitTest
 
             var exception = actionResult.Exception;
 
-            Assert.IsType<TaskCanceledException>(exception?.InnerException);
+            Assert.IsType<TaskCanceledException>(exception);
         }
 
 
