@@ -20,9 +20,9 @@ namespace RulesEngine.Actions
             catch (Exception ex)
             {
                 if (!reSettings.IgnoreException && reSettings.EnableExceptionAsErrorMessage)
-                    result.Exception = new Exception($"Exception while executing {GetType().Name}: {ex.Message}", ex);
+                    result.Exception = ex;
                 else if(!reSettings.IgnoreException && !reSettings.EnableExceptionAsErrorMessage)
-                    throw ex;
+                    throw;
             }
             finally
             {
