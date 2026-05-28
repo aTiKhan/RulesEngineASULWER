@@ -548,7 +548,8 @@ namespace RulesEngine
 
         private string GetCompiledRulesKey(string workflowName, RuleParameter[] ruleParams)
         {
-            var ruleParamsKey = string.Join("-", ruleParams.Select(c => $"{c.Name}_{c.Type.Name}"));
+            // Use FullName instead of Name to avoid collisions
+            var ruleParamsKey = string.Join("-", ruleParams.Select(c => $"{c.Name}_{c.Type.FullName}"));
             var key = $"{workflowName}-" + ruleParamsKey;
             return key;
         }
