@@ -1,11 +1,12 @@
 ﻿// Copyright (c) Microsoft Corporation.
 //  Licensed under the MIT License.
 
-using System.Text.Json;
 using RulesEngine.Models;
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading;
+using static FastExpressionCompiler.ImTools.SmallMap;
 
 namespace RulesEngine.Actions
 {
@@ -25,24 +26,15 @@ namespace RulesEngine.Actions
             _context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var kv in context)
             {
-                string key = kv.Key;
-                string value;
-                switch (kv.Value.GetType().Name)
-                {
-                    case "String":
-                    case "JsonElement":
-                        value = kv.Value.ToString();
-                        break;
-                    default:
-                        value = JsonSerializer.Serialize(kv.Value);
-                        break;
-
-                }
-                _context.Add(key, value);
+                if (kv.Value == null)
+                    continue;
+                else if (kv.Value is string || kv.Value is JsonElement)
+                    _context.Add(kv.Key, kv.Value.ToString());
+                else
+                    _context.Add(kv.Key, JsonSerializer.Serialize(kv.Value));
             }
             _parentResult = parentResult;
         }
-
 
         public RuleResultTree GetParentRuleResult()
         {
@@ -68,9 +60,8 @@ namespace RulesEngine.Actions
             try
             {
                 if (typeof(T) == typeof(string))
-                {
-                    return (T)Convert.ChangeType(_context[name], typeof(T));
-                }
+                    return (T)(object)_context[name];
+                
                 return JsonSerializer.Deserialize<T>(_context[name]);
             }
             catch (KeyNotFoundException)
