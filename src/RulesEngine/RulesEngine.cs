@@ -14,8 +14,8 @@ using RulesEngine.Validators;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace RulesEngine
@@ -33,7 +33,7 @@ namespace RulesEngine
         private readonly RuleExpressionParser _ruleExpressionParser;
         private readonly RuleCompiler _ruleCompiler;
         private readonly ActionFactory _actionFactory;
-        private const string ParamParseRegex = @"\$\(([^)]+)\)";
+        private readonly ErrorMessageFormatter _errorMessageFormatter;
 
         private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions {
             PropertyNameCaseInsensitive = true,
@@ -76,6 +76,7 @@ namespace RulesEngine
             _ruleExpressionParser = new RuleExpressionParser(_reSettings);
             _ruleCompiler = new RuleCompiler(new RuleExpressionBuilderFactory(_reSettings, _ruleExpressionParser), _reSettings);
             _actionFactory = new ActionFactory(GetActionRegistry(_reSettings));
+            _errorMessageFormatter = new ErrorMessageFormatter(_reSettings);
         }
 
         private IDictionary<string, Func<ActionBase>> GetActionRegistry(ReSettings reSettings)
@@ -467,7 +468,7 @@ namespace RulesEngine
                 }
             }
 
-            FormatErrorMessages(result);
+            _errorMessageFormatter.FormatErrorMessages(result);
             return result;
         }
 
@@ -579,75 +580,6 @@ namespace RulesEngine
                 {"OutputExpression",() => new OutputExpressionAction(_ruleExpressionParser) },
                 {"EvaluateRule", () => new EvaluateRuleAction(this,_ruleExpressionParser) }
             };
-        }
-
-        /// <summary>
-        /// The result
-        /// </summary>
-        /// <param name="ruleResultList">The result.</param>
-        /// <returns>Updated error message.</returns>
-        private IEnumerable<RuleResultTree> FormatErrorMessages(IEnumerable<RuleResultTree> ruleResultList)
-        {
-            if (_reSettings.EnableFormattedErrorMessage)
-            {
-                foreach (var ruleResult in ruleResultList?.Where(r => !r.IsSuccess))
-                {
-                    var errorMessage = ruleResult?.Rule?.ErrorMessage;
-                    if (string.IsNullOrWhiteSpace(ruleResult.ExceptionMessage) && errorMessage != null)
-                    {
-                        var errorParameters = Regex.Matches(errorMessage, ParamParseRegex);
-
-                        var inputs = ruleResult.Inputs;
-                        foreach (var param in errorParameters)
-                        {
-                            var paramVal = param?.ToString();
-                            var property = paramVal?.Substring(2, paramVal.Length - 3);
-                            if (property?.Split('.')?.Count() > 1)
-                            {
-                                var typeName = property?.Split('.')?[0];
-                                var propertyName = property?.Split('.')?[1];
-                                errorMessage = UpdateErrorMessage(errorMessage, inputs, property, typeName, propertyName);
-                            }
-                            else
-                            {
-                                var arrParams = inputs?.Select(c => new { Name = c.Key, c.Value });
-                                var model = arrParams?.Where(a => string.Equals(a.Name, property))?.FirstOrDefault();
-                                var value = model?.Value != null ? JsonSerializer.Serialize(model?.Value) : null;
-                                errorMessage = errorMessage?.Replace($"$({property})", value ?? $"$({property})");
-                            }
-                        }
-                        ruleResult.ExceptionMessage = errorMessage;
-                    }
-
-                }
-            }
-            return ruleResultList;
-        }
-
-        /// <summary>
-        /// Updates the error message.
-        /// </summary>
-        /// <param name="errorMessage">The error message.</param>
-        /// <param name="inputs">The evaluated parameters.</param>
-        /// <param name="property">The property.</param>
-        /// <param name="typeName">Name of the type.</param>
-        /// <param name="propertyName">Name of the property.</param>
-        /// <returns>Updated error message.</returns>
-        private static string UpdateErrorMessage(string errorMessage, IDictionary<string, object> inputs, string property, string typeName, string propertyName)
-        {
-            var model = inputs?.FirstOrDefault(c => string.Equals(c.Key, typeName)).Value;
-
-            if (model != null)
-            {
-                using (var jDoc = JsonSerializer.SerializeToDocument(model))
-                {
-                    errorMessage = jDoc.RootElement.TryGetProperty(propertyName, out var jElement) ?
-                        errorMessage.Replace($"$({property})", jElement.GetRawText() ?? $"({property})") :
-                        errorMessage.Replace($"$({property})", $"({property})");
-                }
-            }
-
-            return errorMessage;
         }
 
         #endregion
