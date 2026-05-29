@@ -67,7 +67,7 @@ namespace RulesEngine
 
         public RulesEngine(ReSettings reSettings = null)
         {
-            _reSettings = reSettings == null ? new ReSettings() : new ReSettings(reSettings);
+            _reSettings = new ReSettings(reSettings ?? new ReSettings());
             if (_reSettings.CacheConfig == null)
             {
                 _reSettings.CacheConfig = new MemCacheConfig();
@@ -102,6 +102,10 @@ namespace RulesEngine
         /// <returns>List of rule results</returns>
         public async ValueTask<List<RuleResultTree>> ExecuteAllRulesAsync(string workflowName, params object[] inputs)
         {
+            if (string.IsNullOrWhiteSpace(workflowName))
+            {
+                throw new ArgumentException($"'{nameof(workflowName)}' cannot be null or whitespace.", nameof(workflowName));
+            }
             var ruleParams = new List<RuleParameter>();
 
             for (var i = 0; i < inputs.Length; i++)
@@ -122,6 +126,10 @@ namespace RulesEngine
         /// <returns>List of rule results</returns>
         public async ValueTask<List<RuleResultTree>> ExecuteAllRulesAsync(string workflowName, CancellationToken cancellationToken, params object[] inputs)
         {
+            if (string.IsNullOrWhiteSpace(workflowName))
+            {
+                throw new ArgumentException($"'{nameof(workflowName)}' cannot be null or whitespace.", nameof(workflowName));
+            }
             var ruleParams = new List<RuleParameter>();
 
             for (var i = 0; i < inputs.Length; i++)
@@ -141,11 +149,24 @@ namespace RulesEngine
         /// <returns>List of rule results</returns>
         public async ValueTask<List<RuleResultTree>> ExecuteAllRulesAsync(string workflowName, params RuleParameter[] ruleParams)
         {
+            if (string.IsNullOrWhiteSpace(workflowName))
+            {
+                throw new ArgumentException($"'{nameof(workflowName)}' cannot be null or whitespace.", nameof(workflowName));
+            }
             return await ExecuteAllRulesAsync(workflowName, ruleParams, CancellationToken.None);
         }
 
         public async ValueTask<List<RuleResultTree>> ExecuteAllRulesAsync(string workflowName, RuleParameter[] ruleParams, CancellationToken cancellationToken)
         {
+            if (string.IsNullOrWhiteSpace(workflowName))
+            {
+                throw new ArgumentException($"'{nameof(workflowName)}' cannot be null or whitespace.", nameof(workflowName));
+            }
+
+            if (ruleParams == null)
+            {
+                throw new ArgumentNullException(nameof(ruleParams));
+            }
             // Copy before sorting to avoid mutating caller's array
             var sortedParams = new RuleParameter[ruleParams.Length];
             Array.Copy(ruleParams, sortedParams, ruleParams.Length);
@@ -158,11 +179,35 @@ namespace RulesEngine
 
         public async ValueTask<ActionRuleResult> ExecuteActionWorkflowAsync(string workflowName, string ruleName, RuleParameter[] ruleParameters)
         {
+            if (string.IsNullOrWhiteSpace(workflowName))
+            {
+                throw new ArgumentException($"'{nameof(workflowName)}' cannot be null or whitespace.", nameof(workflowName));
+            }
+
+            if (string.IsNullOrWhiteSpace(ruleName))
+            {
+                throw new ArgumentException($"'{nameof(ruleName)}' cannot be null or whitespace.", nameof(ruleName));
+            }
+
             return await ExecuteActionWorkflowAsync(workflowName, ruleName, ruleParameters, CancellationToken.None);
         }
 
         public async ValueTask<ActionRuleResult> ExecuteActionWorkflowAsync(string workflowName, string ruleName, RuleParameter[] ruleParameters, CancellationToken cancellationToken)
         {
+            if (string.IsNullOrWhiteSpace(workflowName))
+            {
+                throw new ArgumentException($"'{nameof(workflowName)}' cannot be null or whitespace.", nameof(workflowName));
+            }
+
+            if (string.IsNullOrWhiteSpace(ruleName))
+            {
+                throw new ArgumentException($"'{nameof(ruleName)}' cannot be null or whitespace.", nameof(ruleName));
+            }
+
+            if (ruleParameters == null)
+            {
+                throw new ArgumentNullException(nameof(ruleParameters));
+            }
             var compiledRule = GetOrCompileRule(workflowName, ruleName, ruleParameters);
             var resultTree = compiledRule(ruleParameters);
             return await ExecuteActionForRuleResult(resultTree, true, cancellationToken);
@@ -175,6 +220,10 @@ namespace RulesEngine
         /// <exception cref="RuleValidationException"></exception>
         public void AddWorkflow(params Workflow[] workflows)
         {
+            if (workflows == null)
+            {
+                throw new ArgumentNullException(nameof(workflows));
+            }
             try
             {
                 foreach (var workflow in workflows)
@@ -205,6 +254,10 @@ namespace RulesEngine
         /// <exception cref="RuleValidationException"></exception>
         public void AddOrUpdateWorkflow(params Workflow[] workflows)
         {
+            if (workflows == null)
+            {
+                throw new ArgumentNullException(nameof(workflows));
+            }
             try
             {
                 foreach (var workflow in workflows)
@@ -232,6 +285,10 @@ namespace RulesEngine
         /// <returns> <c>true</c> if contains the specified workflow name; otherwise, <c>false</c>.</returns>
         public bool ContainsWorkflow(string workflowName)
         {
+            if (string.IsNullOrWhiteSpace(workflowName))
+            {
+                throw new ArgumentException($"'{nameof(workflowName)}' cannot be null or whitespace.", nameof(workflowName));
+            }
             return _rulesCache.ContainsWorkflows(workflowName);
         }
 
@@ -249,6 +306,10 @@ namespace RulesEngine
         /// <param name="workflowNames">The workflow names.</param>
         public void RemoveWorkflow(params string[] workflowNames)
         {
+            if (workflowNames == null)
+            {
+                throw new ArgumentNullException(nameof(workflowNames));
+            }
             foreach (var workflowName in workflowNames)
             {
                 _rulesCache.Remove(workflowName);
@@ -475,7 +536,9 @@ namespace RulesEngine
         private bool ContainsRuleReferences(string expression, IEnumerable<string> availableRuleNames)
         {
             if (string.IsNullOrEmpty(expression))
+            {
                 return false;
+            }
 
             foreach (var ruleName in availableRuleNames)
             {
@@ -491,7 +554,9 @@ namespace RulesEngine
         private bool ContainsSuccessEventReferences(string expression, IEnumerable<string> availableSuccessEvents)
         {
             if (string.IsNullOrEmpty(expression))
+            {
                 return false;
+            }
 
             foreach (var eventName in availableSuccessEvents)
             {
