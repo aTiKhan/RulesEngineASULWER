@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.0.15]
+
+## What's Changed
+* Bump Microsoft.EntityFrameworkCore from 9.0.11 to 9.0.12 by @dependabot[bot] in https://github.com/asulwer/RulesEngine/pull/160
+* Bump Microsoft.EntityFrameworkCore.Sqlite from 9.0.11 to 9.0.12 by @dependabot[bot] in https://github.com/asulwer/RulesEngine/pull/161
+* Bump coverlet.collector from 6.0.4 to 8.0.0 by @dependabot[bot] in https://github.com/asulwer/RulesEngine/pull/162
+* Bump Microsoft.EntityFrameworkCore from 9.0.12 to 9.0.13 by @dependabot[bot] in https://github.com/asulwer/RulesEngine/pull/164
+* Bump actions/upload-artifact from 6 to 7 by @dependabot[bot] in https://github.com/asulwer/RulesEngine/pull/165
+* removed depricated xunit in favor of latest by @asulwer in https://github.com/asulwer/RulesEngine/pull/167
+
+* FIXED MANY critical_issues by @asulwer in https://github.com/asulwer/RulesEngine/pull/168
+
+**Full Changelog**: https://github.com/asulwer/RulesEngine/compare/v6.0.14...v6.0.15
+
 ## [6.0.14]
 
 ## What's Changed
