@@ -21,7 +21,8 @@ using System.Threading.Tasks;
 namespace RulesEngine
 {
     /// <summary>
-    /// 
+    /// Provides the main entry point for executing rule-based workflows.
+    /// Manages workflow registration, rule compilation, caching, and execution.
     /// </summary>
     /// <seealso cref="RulesEngine.Interfaces.IRulesEngine" />
     public class RulesEngine : IRulesEngine
@@ -44,6 +45,12 @@ namespace RulesEngine
 
         #region Constructor
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RulesEngine"/> class from JSON configuration.
+        /// </summary>
+        /// <param name="jsonConfig">An array of JSON strings representing workflow configurations.</param>
+        /// <param name="reSettings">Optional settings to configure the rules engine behavior.</param>
+        /// <exception cref="RuleException">Thrown when a workflow config fails to deserialize.</exception>
         public RulesEngine(string[] jsonConfig, ReSettings reSettings = null) : this(reSettings)
         {
             var workflow = jsonConfig.Select((item, index) => {
@@ -60,11 +67,20 @@ namespace RulesEngine
             AddWorkflow(workflow);
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RulesEngine"/> class from pre-deserialized workflows.
+        /// </summary>
+        /// <param name="Workflows">An array of workflows to register.</param>
+        /// <param name="reSettings">Optional settings to configure the rules engine behavior.</param>
         public RulesEngine(Workflow[] Workflows, ReSettings reSettings = null) : this(reSettings)
         {
             AddWorkflow(Workflows);
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RulesEngine"/> class with optional settings.
+        /// </summary>
+        /// <param name="reSettings">Optional settings to configure the rules engine behavior.</param>
         public RulesEngine(ReSettings reSettings = null)
         {
             _reSettings = new ReSettings(reSettings ?? new ReSettings());
@@ -79,6 +95,11 @@ namespace RulesEngine
             _errorMessageFormatter = new ErrorMessageFormatter(_reSettings);
         }
 
+        /// <summary>
+        /// Gets the action registry by merging default actions with custom actions from settings.
+        /// </summary>
+        /// <param name="reSettings">The rules engine settings.</param>
+        /// <returns>A dictionary mapping action names to factory functions.</returns>
         private IDictionary<string, Func<ActionBase>> GetActionRegistry(ReSettings reSettings)
         {
             var actionDictionary = GetDefaultActionRegistry();
@@ -156,6 +177,13 @@ namespace RulesEngine
             return await ExecuteAllRulesAsync(workflowName, ruleParams, CancellationToken.None);
         }
 
+        /// <summary>
+        /// Executes all rules in the specified workflow with the given parameters.
+        /// </summary>
+        /// <param name="workflowName">The name of the workflow to execute.</param>
+        /// <param name="ruleParams">The input parameters for rule evaluation.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>A list of rule results.</returns>
         public async ValueTask<List<RuleResultTree>> ExecuteAllRulesAsync(string workflowName, RuleParameter[] ruleParams, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(workflowName))
@@ -177,6 +205,13 @@ namespace RulesEngine
             return ruleResultList;
         }
 
+        /// <summary>
+        /// Executes a specific rule within a workflow and returns the action result.
+        /// </summary>
+        /// <param name="workflowName">The name of the workflow containing the rule.</param>
+        /// <param name="ruleName">The name of the rule to execute.</param>
+        /// <param name="ruleParameters">The input parameters for rule evaluation.</param>
+        /// <returns>The action rule result.</returns>
         public async ValueTask<ActionRuleResult> ExecuteActionWorkflowAsync(string workflowName, string ruleName, RuleParameter[] ruleParameters)
         {
             if (string.IsNullOrWhiteSpace(workflowName))
@@ -192,6 +227,14 @@ namespace RulesEngine
             return await ExecuteActionWorkflowAsync(workflowName, ruleName, ruleParameters, CancellationToken.None);
         }
 
+        /// <summary>
+        /// Executes a specific rule within a workflow and returns the action result.
+        /// </summary>
+        /// <param name="workflowName">The name of the workflow containing the rule.</param>
+        /// <param name="ruleName">The name of the rule to execute.</param>
+        /// <param name="ruleParameters">The input parameters for rule evaluation.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>The action rule result.</returns>
         public async ValueTask<ActionRuleResult> ExecuteActionWorkflowAsync(string workflowName, string ruleName, RuleParameter[] ruleParameters, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(workflowName))
@@ -273,6 +316,10 @@ namespace RulesEngine
             }
         }
 
+        /// <summary>
+        /// Gets a list of all registered workflow names.
+        /// </summary>
+        /// <returns>A list of workflow names.</returns>
         public List<string> GetAllRegisteredWorkflowNames()
         {
             return _rulesCache.GetAllWorkflowNames();
@@ -320,6 +367,11 @@ namespace RulesEngine
 
         #region Private Methods
 
+        /// <summary>
+        /// Executes actions for a collection of rule results, including nested child results.
+        /// </summary>
+        /// <param name="ruleResultList">The rule results to process.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
         private async ValueTask ExecuteActionAsync(IEnumerable<RuleResultTree> ruleResultList, CancellationToken cancellationToken = default)
         {
             foreach (var ruleResult in ruleResultList)
@@ -335,6 +387,13 @@ namespace RulesEngine
             }
         }
 
+        /// <summary>
+        /// Executes the action configured for a single rule result (OnSuccess or OnFailure).
+        /// </summary>
+        /// <param name="resultTree">The rule result to process.</param>
+        /// <param name="includeRuleResults">Whether to include rule results in the output.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>The action execution result.</returns>
         private async ValueTask<ActionRuleResult> ExecuteActionForRuleResult(RuleResultTree resultTree, bool includeRuleResults = false, CancellationToken cancellationToken = default)
         {
             var ruleActions = resultTree?.Rule?.Actions;
@@ -357,13 +416,13 @@ namespace RulesEngine
         }
 
         /// <summary>
-        /// This will validate workflow rules then call execute method
+        /// Validates the workflow exists, compiles rules if needed, and executes all rules.
         /// </summary>
-        /// <typeparam name="T">type of entity</typeparam>
-        /// <param name="input">input</param>
-        /// <param name="workflowName">workflow name</param>
-        /// <returns>list of rule result set</returns>
-        internal List<RuleResultTree> ValidateWorkflowAndExecuteRule(string workflowName, RuleParameter[] ruleParams)
+        /// <param name="workflowName">The name of the workflow.</param>
+        /// <param name="ruleParams">The input parameters for rule evaluation.</param>
+        /// <returns>A list of rule results.</returns>
+        /// <exception cref="ArgumentException">Thrown when the workflow is not registered.</exception>
+        private List<RuleResultTree> ValidateWorkflowAndExecuteRule(string workflowName, RuleParameter[] ruleParams)
         {
             List<RuleResultTree> result;
 
@@ -380,13 +439,11 @@ namespace RulesEngine
         }
 
         /// <summary>
-        /// This will compile the rules and store them to dictionary
+        /// Compiles and caches rules for the specified workflow if not already up-to-date.
         /// </summary>
-        /// <param name="workflowName">workflow name</param>
-        /// <param name="ruleParams">The rule parameters.</param>
-        /// <returns>
-        /// bool result
-        /// </returns>
+        /// <param name="workflowName">The name of the workflow.</param>
+        /// <param name="ruleParams">The input parameters for rule evaluation.</param>
+        /// <returns><c>true</c> if registration succeeded; otherwise, <c>false</c>.</returns>
         private bool RegisterRule(string workflowName, params RuleParameter[] ruleParams)
         {
             var compileRulesKey = GetCompiledRulesKey(workflowName, ruleParams);
@@ -423,6 +480,14 @@ namespace RulesEngine
             }
         }
 
+        /// <summary>
+        /// Gets a compiled rule from cache, or compiles it on demand if not found.
+        /// </summary>
+        /// <param name="workflowName">The name of the workflow.</param>
+        /// <param name="ruleName">The name of the rule.</param>
+        /// <param name="ruleParameters">The input parameters for rule evaluation.</param>
+        /// <returns>The compiled rule delegate.</returns>
+        /// <exception cref="ArgumentException">Thrown when the workflow or rule is not found.</exception>
         private RuleFunc<RuleResultTree> GetOrCompileRule(string workflowName, string ruleName, RuleParameter[] ruleParameters)
         {
             // Ensure the workflow is registered and rules are compiled
@@ -445,6 +510,14 @@ namespace RulesEngine
             return CompileRuleByName(workflowName, ruleName, ruleParameters);
         }
 
+        /// <summary>
+        /// Compiles a rule by looking it up from the workflow by name.
+        /// </summary>
+        /// <param name="workflowName">The name of the workflow.</param>
+        /// <param name="ruleName">The name of the rule to compile.</param>
+        /// <param name="ruleParameters">The input parameters for rule evaluation.</param>
+        /// <returns>The compiled rule delegate.</returns>
+        /// <exception cref="ArgumentException">Thrown when the workflow or rule is not found.</exception>
         private RuleFunc<RuleResultTree> CompileRuleByName(string workflowName, string ruleName, RuleParameter[] ruleParameters)
         {
             var workflow = _rulesCache.GetWorkflow(workflowName);
@@ -463,6 +536,14 @@ namespace RulesEngine
             return CompileRuleInternal(currentRule, workflow.RuleExpressionType, ruleParameters, globalParamExp);
         }
 
+        /// <summary>
+        /// Delegates rule compilation to the <see cref="RuleCompiler"/>.
+        /// </summary>
+        /// <param name="rule">The rule to compile.</param>
+        /// <param name="ruleExpressionType">The type of rule expression.</param>
+        /// <param name="ruleParams">The input parameters for rule evaluation.</param>
+        /// <param name="scopedParams">Lazy-loaded scoped expression parameters.</param>
+        /// <returns>The compiled rule delegate.</returns>
         private RuleFunc<RuleResultTree> CompileRuleInternal(Rule rule, RuleExpressionType ruleExpressionType, RuleParameter[] ruleParams, Lazy<RuleExpressionParameter[]> scopedParams)
         {
             return _ruleCompiler.CompileRule(rule, ruleExpressionType, ruleParams, scopedParams);
@@ -471,8 +552,8 @@ namespace RulesEngine
         /// <summary>
         /// This will execute the compiled rules 
         /// </summary>
-        /// <param name="workflowName"></param>
-        /// <param name="ruleParams"></param>
+        /// <param name="workflowName">The name of the workflow.</param>
+        /// <param name="ruleParams">The input parameters for rule evaluation.</param>
         /// <returns>list of rule result set</returns>
         private List<RuleResultTree> ExecuteAllRuleByWorkflow(string workflowName, RuleParameter[] ruleParameters)
         {
@@ -533,6 +614,12 @@ namespace RulesEngine
             return result;
         }
 
+        /// <summary>
+        /// Checks if the expression contains references to other rules (e.g., @RuleName).
+        /// </summary>
+        /// <param name="expression">The rule expression to check.</param>
+        /// <param name="availableRuleNames">The names of rules that have been evaluated so far.</param>
+        /// <returns><c>true</c> if the expression contains a rule reference; otherwise, <c>false</c>.</returns>
         private bool ContainsRuleReferences(string expression, IEnumerable<string> availableRuleNames)
         {
             if (string.IsNullOrEmpty(expression))
@@ -551,6 +638,12 @@ namespace RulesEngine
             return false;
         }
 
+        /// <summary>
+        /// Checks if the expression contains references to success events.
+        /// </summary>
+        /// <param name="expression">The rule expression to check.</param>
+        /// <param name="availableSuccessEvents">The success events that have been collected so far.</param>
+        /// <returns><c>true</c> if the expression contains a success event reference; otherwise, <c>false</c>.</returns>
         private bool ContainsSuccessEventReferences(string expression, IEnumerable<string> availableSuccessEvents)
         {
             if (string.IsNullOrEmpty(expression))
@@ -569,6 +662,16 @@ namespace RulesEngine
             return false;
         }
 
+        /// <summary>
+        /// Compiles a rule that references other rule results or success events.
+        /// </summary>
+        /// <param name="rule">The rule to compile.</param>
+        /// <param name="ruleExpressionType">The type of rule expression.</param>
+        /// <param name="ruleParameters">The input parameters for rule evaluation.</param>
+        /// <param name="ruleResults">Previously evaluated rule results.</param>
+        /// <param name="successEvents">Previously collected success events.</param>
+        /// <param name="workflow">The parent workflow for global parameters.</param>
+        /// <returns>The compiled rule delegate with reference resolution.</returns>
         private RuleFunc<RuleResultTree> CompileRuleWithReferences(Rule rule, RuleExpressionType ruleExpressionType, RuleParameter[] ruleParameters, Dictionary<string, bool> ruleResults, HashSet<string> successEvents, Workflow workflow = null)
         {
             var globalParamExp = new Lazy<RuleExpressionParameter[]>(
@@ -631,6 +734,12 @@ namespace RulesEngine
             return CompileRuleInternal(modifiedRule, ruleExpressionType, ruleParameters, globalParamExp);
         }
 
+        /// <summary>
+        /// Generates a cache key for compiled rules based on workflow and parameter types.
+        /// </summary>
+        /// <param name="workflowName">The name of the workflow.</param>
+        /// <param name="ruleParams">The input parameters for rule evaluation.</param>
+        /// <returns>A unique cache key string.</returns>
         private string GetCompiledRulesKey(string workflowName, RuleParameter[] ruleParams)
         {
             // Use FullName instead of Name to avoid collisions
@@ -639,6 +748,10 @@ namespace RulesEngine
             return key;
         }
 
+        /// <summary>
+        /// Gets the default action registry with built-in actions.
+        /// </summary>
+        /// <returns>A dictionary mapping action names to factory functions.</returns>
         private IDictionary<string, Func<ActionBase>> GetDefaultActionRegistry()
         {
             return new Dictionary<string, Func<ActionBase>>{
