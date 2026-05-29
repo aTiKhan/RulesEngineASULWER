@@ -162,7 +162,7 @@ namespace RulesEngine
 
         public async ValueTask<ActionRuleResult> ExecuteActionWorkflowAsync(string workflowName, string ruleName, RuleParameter[] ruleParameters, CancellationToken cancellationToken)
         {
-            var compiledRule = GetCompiledRule(workflowName, ruleName, ruleParameters);
+            var compiledRule = GetOrCompileRule(workflowName, ruleName, ruleParameters);
             var resultTree = compiledRule(ruleParameters);
             return await ExecuteActionForRuleResult(resultTree, true, cancellationToken);
         }
@@ -349,7 +349,7 @@ namespace RulesEngine
 
                 foreach (var rule in workflow.Rules.Where(c => c.Enabled))
                 {
-                    dictFunc.Add(rule.RuleName, CompileRule(rule, workflow.RuleExpressionType, ruleParams, globalParamExp));
+                    dictFunc.Add(rule.RuleName, CompileRuleInternal(rule, workflow.RuleExpressionType, ruleParams, globalParamExp));
                 }
 
                 _rulesCache.AddOrUpdateCompiledRule(compileRulesKey, dictFunc);
@@ -361,7 +361,7 @@ namespace RulesEngine
             }
         }
 
-        private RuleFunc<RuleResultTree> GetCompiledRule(string workflowName, string ruleName, RuleParameter[] ruleParameters)
+        private RuleFunc<RuleResultTree> GetOrCompileRule(string workflowName, string ruleName, RuleParameter[] ruleParameters)
         {
             // Ensure the workflow is registered and rules are compiled
             if (!RegisterRule(workflowName, ruleParameters))
@@ -380,10 +380,10 @@ namespace RulesEngine
 
             // Fallback to individual compilation if not found in cache
             // This should rarely happen, but provides safety
-            return CompileRule(workflowName, ruleName, ruleParameters);
+            return CompileRuleByName(workflowName, ruleName, ruleParameters);
         }
 
-        private RuleFunc<RuleResultTree> CompileRule(string workflowName, string ruleName, RuleParameter[] ruleParameters)
+        private RuleFunc<RuleResultTree> CompileRuleByName(string workflowName, string ruleName, RuleParameter[] ruleParameters)
         {
             var workflow = _rulesCache.GetWorkflow(workflowName);
             if (workflow == null)
@@ -398,10 +398,10 @@ namespace RulesEngine
             var globalParamExp = new Lazy<RuleExpressionParameter[]>(
                   () => _ruleCompiler.GetRuleExpressionParameters(workflow.RuleExpressionType, workflow.GlobalParams, ruleParameters)
               );
-            return CompileRule(currentRule, workflow.RuleExpressionType, ruleParameters, globalParamExp);
+            return CompileRuleInternal(currentRule, workflow.RuleExpressionType, ruleParameters, globalParamExp);
         }
 
-        private RuleFunc<RuleResultTree> CompileRule(Rule rule, RuleExpressionType ruleExpressionType, RuleParameter[] ruleParams, Lazy<RuleExpressionParameter[]> scopedParams)
+        private RuleFunc<RuleResultTree> CompileRuleInternal(Rule rule, RuleExpressionType ruleExpressionType, RuleParameter[] ruleParams, Lazy<RuleExpressionParameter[]> scopedParams)
         {
             return _ruleCompiler.CompileRule(rule, ruleExpressionType, ruleParams, scopedParams);
         }
@@ -435,7 +435,7 @@ namespace RulesEngine
                 if (hasRuleReferences && _reSettings.EnableScopedParams)
                 {
                     // Compile rule with additional scoped parameters for rule results
-                    compiledRule = CompileRuleWithRuleResults(rule, workflow.RuleExpressionType, extendedRuleParameters.ToArray(), ruleResults, successEvents, workflow);
+                    compiledRule = CompileRuleWithReferences(rule, workflow.RuleExpressionType, extendedRuleParameters.ToArray(), ruleResults, successEvents, workflow);
                 }
                 else
                 {
@@ -450,7 +450,7 @@ namespace RulesEngine
                         var globalParamExp = new Lazy<RuleExpressionParameter[]>(
                             () => _ruleCompiler.GetRuleExpressionParameters(workflow.RuleExpressionType, workflow.GlobalParams, ruleParameters)
                         );
-                        compiledRule = CompileRule(rule, workflow.RuleExpressionType, ruleParameters, globalParamExp);
+                        compiledRule = CompileRuleInternal(rule, workflow.RuleExpressionType, ruleParameters, globalParamExp);
                     }
                 }
 
@@ -503,7 +503,7 @@ namespace RulesEngine
             return false;
         }
 
-        private RuleFunc<RuleResultTree> CompileRuleWithRuleResults(Rule rule, RuleExpressionType ruleExpressionType, RuleParameter[] ruleParameters, Dictionary<string, bool> ruleResults, HashSet<string> successEvents, Workflow workflow = null)
+        private RuleFunc<RuleResultTree> CompileRuleWithReferences(Rule rule, RuleExpressionType ruleExpressionType, RuleParameter[] ruleParameters, Dictionary<string, bool> ruleResults, HashSet<string> successEvents, Workflow workflow = null)
         {
             var globalParamExp = new Lazy<RuleExpressionParameter[]>(
                 () => _ruleCompiler.GetRuleExpressionParameters(ruleExpressionType, workflow?.GlobalParams, ruleParameters)
@@ -562,7 +562,7 @@ namespace RulesEngine
                 WorkflowsToInject = rule.WorkflowsToInject
             };
 
-            return CompileRule(modifiedRule, ruleExpressionType, ruleParameters, globalParamExp);
+            return CompileRuleInternal(modifiedRule, ruleExpressionType, ruleParameters, globalParamExp);
         }
 
         private string GetCompiledRulesKey(string workflowName, RuleParameter[] ruleParams)
