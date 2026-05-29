@@ -1,8 +1,10 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using RulesEngine.Models;
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
@@ -10,12 +12,12 @@ using System.Linq.Dynamic.Core;
 using System.Reflection;
 using System.Text.Json;
 
-using RulesEngine.Models;
-
 namespace RulesEngine.HelperFunctions
 {
     public static class Utils
     {
+        private static readonly ConcurrentDictionary<string, Type> _typeCache = new();
+
         public static object GetTypedObject(dynamic input)
         {
             if (input is ExpandoObject)
@@ -28,50 +30,48 @@ namespace RulesEngine.HelperFunctions
                 return input;
             }
         }
+
         public static Type CreateAbstractClassType(dynamic input)
         {
             List<DynamicProperty> props = new List<DynamicProperty>();
 
-            if (input is JsonElement jsonElement)
+            try
             {
-                input = jsonElement.ToExpandoObject();
-            }
-            if (input == null)
-            {
-                return typeof(object);
-            }
-            if (!(input is ExpandoObject))
-            {
-                return input.GetType();
-            }
+                if (input is JsonElement jsonElement)
+                    input = jsonElement.ToExpandoObject();
 
-            else
-            {
+                if (!(input is ExpandoObject))
+                    return input.GetType();
+
                 foreach (var expando in (IDictionary<string, object>)input)
                 {
-                    Type value;
+                    Type t;
                     if (expando.Value is IList list)
                     {
                         if (list.Count == 0)
                         {
-                            value = typeof(List<Dictionary<string, ImplicitObject>>);
+                            t = typeof(List<Dictionary<string, ImplicitObject>>);
                         }
                         else
                         {
                             var internalType = CreateAbstractClassType(list[0]);
-                            value = typeof(List<>).MakeGenericType(internalType);
+                            t = typeof(List<>).MakeGenericType(internalType);
                         }
                     }
                     else
                     {
-                        value = CreateAbstractClassType(expando.Value);
+                        t = CreateAbstractClassType(expando.Value);
                     }
-                    props.Add(new DynamicProperty(expando.Key, value));
+                    props.Add(new DynamicProperty(expando.Key, t));
                 }
             }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error creating abstract class type: {ex.Message}", ex);
+            }
 
-            var type = DynamicClassFactory.CreateType(props);
-            return type;
+            var cacheKey = GetTypeCacheKey(props);
+            return _typeCache.GetOrAdd(cacheKey, _ => DynamicClassFactory.CreateType(props));
         }
 
         public static object CreateObject(Type type, dynamic input)
@@ -85,14 +85,14 @@ namespace RulesEngine.HelperFunctions
             {
                 return Convert.ChangeType(input, type);
             }
+
             object obj = Activator.CreateInstance(type);
 
             var typeProps = type.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Instance).ToDictionary(c => c.Name);
 
             foreach (var expando in (IDictionary<string, object>)input)
             {
-                if (typeProps.ContainsKey(expando.Key) &&
-                    expando.Value != null && (expando.Value.GetType().Name != "DBNull" || expando.Value != DBNull.Value))
+                if (typeProps.ContainsKey(expando.Key) && expando.Value != null && !(expando.Value is DBNull))
                 {
                     object val;
                     var propInfo = typeProps[expando.Key];
@@ -105,7 +105,7 @@ namespace RulesEngine.HelperFunctions
                     {
                         var internalType = propInfo.PropertyType.GenericTypeArguments.FirstOrDefault() ?? typeof(object);
                         var temp = (IList)expando.Value;
-                        var newList = new List<object>().Cast(internalType).ToList(internalType);
+                        var newList = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(internalType));
                         for (int i = 0; i < temp.Count; i++)
                         {
                             var child = CreateObject(internalType, temp[i]);
@@ -128,18 +128,6 @@ namespace RulesEngine.HelperFunctions
             return obj;
         }
 
-        private static IEnumerable Cast(this IEnumerable self, Type innerType)
-        {
-            var methodInfo = typeof(Enumerable).GetMethod("Cast");
-            var genericMethod = methodInfo.MakeGenericMethod(innerType);
-            return genericMethod.Invoke(null, new[] { self }) as IEnumerable;
-        }
-
-        private static IList ToList(this IEnumerable self, Type innerType)
-        {
-            var methodInfo = typeof(Enumerable).GetMethod("ToList");
-            var genericMethod = methodInfo.MakeGenericMethod(innerType);
-            return genericMethod.Invoke(null, new[] { self }) as IList;
-        }
+        private static string GetTypeCacheKey(List<DynamicProperty> props) => string.Join("|", props.Select((p, i) => $"{i}:{p.Name}:{p.Type.FullName}"));
     }
 }
