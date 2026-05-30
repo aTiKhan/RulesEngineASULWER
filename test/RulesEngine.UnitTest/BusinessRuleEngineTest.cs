@@ -397,10 +397,9 @@ namespace RulesEngine.UnitTest
 
             input1.Property1 = propValue;
 
-
             var utils = new TestInstanceUtils();
 
-            var result = await re.ExecuteAllRulesAsync("inputWorkflow", new RuleParameter("input1", input1), new RuleParameter("utils", utils));
+            var result = await re.ExecuteAllRulesAsync("inputWorkflow", new[] { new RuleParameter("input1", input1), new RuleParameter("utils", utils) });
             Assert.NotNull(result);
             Assert.IsType<List<RuleResultTree>>(result);
             Assert.All(result, c => Assert.Equal(expectedResult, c.IsSuccess));

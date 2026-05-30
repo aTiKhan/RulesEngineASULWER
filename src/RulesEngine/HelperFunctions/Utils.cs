@@ -40,6 +40,9 @@ namespace RulesEngine.HelperFunctions
                 if (input is JsonElement jsonElement)
                     input = jsonElement.ToExpandoObject();
 
+                if (input == null)
+                    return typeof(object);
+
                 if (!(input is ExpandoObject))
                     return input.GetType();
 
