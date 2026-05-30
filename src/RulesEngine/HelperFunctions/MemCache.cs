@@ -78,18 +78,29 @@ namespace RulesEngine.HelperFunctions
         {
             var fixedExpiry = expiry ?? DateTimeOffset.MaxValue;
 
-            // If at capacity, evict oldest by expiry
+            // If over capacity, scan once and remove expired or arbitrary
+            if (_cacheDictionary.Count >= _config.SizeLimit)
+            {
+                foreach (var kv in _cacheDictionary)
+                {
+                    if (_cacheDictionary.Count < _config.SizeLimit)
+                        break;
+
+                    if (kv.Value.expiry < DateTimeOffset.UtcNow)
+                    {
+                        _cacheDictionary.TryRemove(kv.Key, out _);
+                    }
+                }
+            }
+
+            // If still at capacity, remove arbitrary entries
             while (_cacheDictionary.Count > _config.SizeLimit)
             {
-                var oldest = _cacheDictionary.OrderBy(kv => kv.Value.expiry).FirstOrDefault();
-                if (oldest.Key != null)
-                {
-                    _cacheDictionary.TryRemove(oldest.Key, out _);
-                }
-                else
-                {
-                    break; // Shouldn't happen but prevents infinite loop
-                }
+                var keyToRemove = _cacheDictionary.Keys.FirstOrDefault();
+                if (keyToRemove == null)
+                    break;
+
+                _cacheDictionary.TryRemove(keyToRemove, out _);
             }
 
             _cacheDictionary.AddOrUpdate(key, (value, fixedExpiry), (k, v) => (value, fixedExpiry));
