@@ -5,7 +5,8 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace RulesEngine.Models
 {
-    /// <summary>Class LocalParam.
+    /// <summary>
+    /// Class LocalParam.
     /// </summary>
     [ExcludeFromCodeCoverage]
     public class ScopedParam
@@ -16,7 +17,7 @@ namespace RulesEngine.Models
         /// </summary>
         /// <value>
         /// The name of the rule.
-        /// </value>]
+        /// </value>
         public string Name { get; set; }
 
         /// <summary>

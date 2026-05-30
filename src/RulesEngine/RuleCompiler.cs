@@ -14,17 +14,17 @@ using System.Linq.Expressions;
 namespace RulesEngine
 {
     /// <summary>
-    /// Rule compilers
+    /// Compiles rule definitions into executable delegates, handling nested rule operators and scoped parameters.
     /// </summary>
     internal class RuleCompiler
     {
         /// <summary>
-        /// The nested operators
+        /// The nested operators supported for grouping child rules.
         /// </summary>
         private readonly ExpressionType[] nestedOperators = new ExpressionType[] { ExpressionType.And, ExpressionType.AndAlso, ExpressionType.Or, ExpressionType.OrElse };
 
         /// <summary>
-        /// The expression builder factory
+        /// The factory used to get the appropriate expression builder for a rule expression type.
         /// </summary>
         private readonly RuleExpressionBuilderFactory _expressionBuilderFactory;
         private readonly ReSettings _reSettings;
@@ -41,13 +41,14 @@ namespace RulesEngine
         }
 
         /// <summary>
-        /// Compiles the rule
+        /// Compiles a rule into an executable delegate that evaluates the rule against input parameters.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="rule"></param>
-        /// <param name="input"></param>
-        /// <param name="ruleParam"></param>
-        /// <returns>Compiled func delegate</returns>
+        /// <param name="rule">The rule to compile.</param>
+        /// <param name="ruleExpressionType">The type of rule expression.</param>
+        /// <param name="ruleParams">The input parameters available to the rule.</param>
+        /// <param name="globalParams">Lazy-loaded global expression parameters.</param>
+        /// <returns>A compiled delegate that evaluates the rule.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="rule"/> is null.</exception>
         internal RuleFunc<RuleResultTree> CompileRule(Rule rule, RuleExpressionType ruleExpressionType, RuleParameter[] ruleParams, Lazy<RuleExpressionParameter[]> globalParams)
         {
             if (rule == null)
@@ -73,12 +74,11 @@ namespace RulesEngine
         }
 
         /// <summary>
-        /// Gets the expression for rule.
+        /// Gets the delegate for evaluating a rule, including its local scoped parameters.
         /// </summary>
-        /// <param name="rule">The rule.</param>
-        /// <param name="typeParameterExpressions">The type parameter expressions.</param>
-        /// <param name="ruleInputExp">The rule input exp.</param>
-        /// <returns></returns>
+        /// <param name="rule">The rule to evaluate.</param>
+        /// <param name="ruleParams">The input parameters available to the rule.</param>
+        /// <returns>A delegate that evaluates the rule.</returns>
         private RuleFunc<RuleResultTree> GetDelegateForRule(Rule rule, RuleParameter[] ruleParams)
         {
             var scopedParamList = GetRuleExpressionParameters(rule.RuleExpressionType, rule?.LocalParams, ruleParams);
@@ -101,7 +101,14 @@ namespace RulesEngine
             return GetWrappedRuleFunc(rule, ruleFn, ruleParams, scopedParamList);
         }
 
-        internal RuleExpressionParameter[] GetRuleExpressionParameters(RuleExpressionType ruleExpressionType,IEnumerable<ScopedParam> localParams, RuleParameter[] ruleParams)
+        /// <summary>
+        /// Gets expression parameters for the specified local scoped parameters.
+        /// </summary>
+        /// <param name="ruleExpressionType">The type of rule expression.</param>
+        /// <param name="localParams">The local scoped parameters defined on the rule.</param>
+        /// <param name="ruleParams">The input parameters available to the rule.</param>
+        /// <returns>An array of rule expression parameters.</returns>
+        internal RuleExpressionParameter[] GetRuleExpressionParameters(RuleExpressionType ruleExpressionType, IEnumerable<ScopedParam> localParams, RuleParameter[] ruleParams)
         {
             if(!_reSettings.EnableScopedParams)
             {
@@ -143,13 +150,12 @@ namespace RulesEngine
         }
 
         /// <summary>
-        /// Builds the expression.
+        /// Builds a rule function for a simple (non-nested) rule.
         /// </summary>
-        /// <param name="rule">The rule.</param>
-        /// <param name="typeParameterExpressions">The type parameter expressions.</param>
-        /// <param name="ruleInputExp">The rule input exp.</param>
-        /// <returns></returns>
-        /// <exception cref="InvalidOperationException"></exception>
+        /// <param name="rule">The rule to build.</param>
+        /// <param name="ruleParams">The input parameters available to the rule.</param>
+        /// <returns>A delegate that evaluates the rule.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when the rule expression cannot be built.</exception>
         private RuleFunc<RuleResultTree> BuildRuleFunc(Rule rule, RuleParameter[] ruleParams)
         {
             var ruleExpressionBuilder = GetExpressionBuilder(rule.RuleExpressionType);
@@ -160,15 +166,13 @@ namespace RulesEngine
         }
 
         /// <summary>
-        /// Builds the nested expression.
+        /// Builds a rule function for a nested rule (And/Or) with child rules.
         /// </summary>
-        /// <param name="parentRule">The parent rule.</param>
-        /// <param name="childRules">The child rules.</param>
-        /// <param name="operation">The operation.</param>
-        /// <param name="typeParameterExpressions">The type parameter expressions.</param>
-        /// <param name="ruleInputExp">The rule input exp.</param>
-        /// <returns>Expression of func delegate</returns>
-        /// <exception cref="InvalidCastException"></exception>
+        /// <param name="parentRule">The parent rule containing child rules.</param>
+        /// <param name="operation">The logical operation to apply (And/AndAlso/Or/OrElse).</param>
+        /// <param name="ruleParams">The input parameters available to the rule.</param>
+        /// <returns>A delegate that evaluates the nested rule.</returns>
+        /// <exception cref="InvalidCastException">Thrown when child rules cannot be evaluated.</exception>
         private RuleFunc<RuleResultTree> BuildNestedRuleFunc(Rule parentRule, ExpressionType operation, RuleParameter[] ruleParams)
         {
             var ruleFuncList = new List<RuleFunc<RuleResultTree>>();
@@ -185,6 +189,13 @@ namespace RulesEngine
             };
         }
 
+        /// <summary>
+        /// Applies a logical operation (And/Or) across a collection of rule results.
+        /// </summary>
+        /// <param name="paramArray">The input parameters.</param>
+        /// <param name="ruleFuncList">The list of compiled rule functions.</param>
+        /// <param name="operation">The logical expression type.</param>
+        /// <returns>A tuple with the overall success flag and the collected results.</returns>
         private (bool isSuccess ,IEnumerable<RuleResultTree> result) ApplyOperation(RuleParameter[] paramArray,IEnumerable<RuleFunc<RuleResultTree>> ruleFuncList, ExpressionType operation)
         {
             if (ruleFuncList?.Any() != true)
@@ -229,12 +240,27 @@ namespace RulesEngine
             return (isSuccess, resultList);
         }
 
-        internal Func<object[],Dictionary<string,object>> CompileScopedParams(RuleExpressionType ruleExpressionType, RuleParameter[] ruleParameters,RuleExpressionParameter[] ruleExpParams)
+        /// <summary>
+        /// Compiles scoped parameters into a delegate that evaluates them against input values.
+        /// </summary>
+        /// <param name="ruleExpressionType">The type of rule expression.</param>
+        /// <param name="ruleParameters">The input parameters.</param>
+        /// <param name="ruleExpParams">The scoped expression parameters to compile.</param>
+        /// <returns>A delegate that evaluates scoped parameters and returns a dictionary of values.</returns>
+        private Func<object[],Dictionary<string,object>> CompileScopedParams(RuleExpressionType ruleExpressionType, RuleParameter[] ruleParameters,RuleExpressionParameter[] ruleExpParams)
         {
             return GetExpressionBuilder(ruleExpressionType).CompileScopedParams(ruleParameters, ruleExpParams);
 
         }
 
+        /// <summary>
+        /// Wraps a compiled rule function with scoped parameter evaluation logic.
+        /// </summary>
+        /// <param name="rule">The rule being wrapped.</param>
+        /// <param name="ruleFunc">The compiled rule function.</param>
+        /// <param name="ruleParameters">The input parameters.</param>
+        /// <param name="ruleExpParams">The scoped expression parameters.</param>
+        /// <returns>A wrapped delegate that evaluates scoped params before invoking the rule.</returns>
         private RuleFunc<RuleResultTree> GetWrappedRuleFunc(Rule rule, RuleFunc<RuleResultTree> ruleFunc,RuleParameter[] ruleParameters,RuleExpressionParameter[] ruleExpParams)
         {
             if(ruleExpParams.Length == 0)
@@ -264,6 +290,11 @@ namespace RulesEngine
             };
         }
 
+        /// <summary>
+        /// Gets the expression builder for the specified rule expression type.
+        /// </summary>
+        /// <param name="expressionType">The rule expression type.</param>
+        /// <returns>The expression builder.</returns>
         private RuleExpressionBuilderBase GetExpressionBuilder(RuleExpressionType expressionType)
         {
             return _expressionBuilderFactory.RuleGetExpressionBuilder(expressionType);

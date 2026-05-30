@@ -16,20 +16,13 @@ namespace RulesEngine.ExpressionBuilders
     public class RuleExpressionParser
     {
         private readonly ReSettings _reSettings;
-        private readonly IDictionary<string, MethodInfo> _methodInfo;
+        private static readonly MethodInfo _dictAddMethod = typeof(Dictionary<string, object>).GetMethod("Add", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(string), typeof(object) }, null);
 
         public RuleExpressionParser(ReSettings reSettings = null)
         {
             _reSettings = reSettings ?? new ReSettings();
-            _methodInfo = new Dictionary<string, MethodInfo>();
-            PopulateMethodInfo();
         }
-
-        private void PopulateMethodInfo()
-        {
-            var dict_add = typeof(Dictionary<string, object>).GetMethod("Add", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(string), typeof(object) }, null);
-            _methodInfo.Add("dict_add", dict_add);
-        }
+                
         public Expression Parse(string expression, ParameterExpression[] parameters, Type returnType)
         {
             if (parameters == null)
@@ -142,8 +135,7 @@ namespace RulesEngine.ExpressionBuilders
             body.AddRange(variableExpressions);
 
             var dict = Expression.Variable(typeof(Dictionary<string, object>));
-            var add = _methodInfo["dict_add"];
-
+            
             body.Add(Expression.Assign(dict, Expression.New(typeof(Dictionary<string, object>))));
             variableExp.Add(dict);
 
@@ -156,7 +148,7 @@ namespace RulesEngine.ExpressionBuilders
                 var key = Expression.Constant(ruleExpParams[i].ParameterExpression.Name);
                 var value = Expression.Convert(ruleExpParams[i].ParameterExpression, typeof(object));
                 variableExp.Add(ruleExpParams[i].ParameterExpression);
-                body.Add(Expression.Call(dict, add, key, value));
+                body.Add(Expression.Call(dict, _dictAddMethod, key, value));
             
             }
             // Return value
