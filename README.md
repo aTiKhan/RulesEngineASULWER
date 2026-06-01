@@ -2,9 +2,9 @@
 
 [Rules Engine](https://asulwer.github.io/RulesEngine/) moved from Wiki to GitHub Pages.
 
-# [Alternate RulesEngine](https://github.com/asulwer/Rules)
+# [Alternate RulesEngine](https://github.com/asulwer/RoslynRules)
 
-NOTE: I have been writing a rewrite that is considerably faster than the original RulesEngine (and this fork).  Very infant and not published on Nuget.
+NOTE: I have been writing a rewrite that is considerably faster than the original RulesEngine (and this fork).  [Published to nuget as RoslynRules](https://github.com/asulwer/RoslynRules).
 
 # Rules Engine
 ![build](https://github.com/asulwer/RulesEngine/actions/workflows/dotnetcore-build.yml/badge.svg?branch=main)
